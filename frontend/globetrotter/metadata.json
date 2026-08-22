@@ -1,0 +1,6 @@
+{
+  "name": "GlobeTrotter",
+  "description": "Smart full-stack travel itinerary planner and vacation builder with AI trip generation, interactive day-by-day schedules, bento-grid destination discovery, and budget tracking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

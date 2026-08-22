@@ -1,150 +1,146 @@
 import uuid
 from datetime import datetime
 from sqlalchemy import (
-    Column, String, Text, Boolean, Integer, Numeric, Date, DateTime, 
-    ForeignKey, CheckConstraint, UniqueConstraint
+    Column,
+    String,
+    Integer,
+    Float,
+    Boolean,
+    Text,
+    DateTime,
+    ForeignKey,
+    JSON
 )
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
-from database import Base
+from .database import Base
 
-class User(Base):
-    __tablename__ = "users"
+def generate_uuid() -> str:
+    return str(uuid.uuid4())
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    email = Column(String(255), nullable=False, unique=True, index=True)
-    password_hash = Column(String(255), nullable=False)
-    full_name = Column(String(100), nullable=True)
-    profile_photo_url = Column(Text, nullable=True)
-    language_preference = Column(String(10), default="en")
-    is_admin = Column(Boolean, default=False)
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
-    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+class DestinationModel(Base):
+    __tablename__ = "destinations"
 
-    trips = relationship("Trip", back_populates="user", cascade="all, delete-orphan")
-    saved_destinations = relationship("UserSavedDestination", back_populates="user", cascade="all, delete-orphan")
-
-class City(Base):
-    __tablename__ = "cities"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String, primary_key=True, default=generate_uuid)
     name = Column(String(100), nullable=False, index=True)
     country = Column(String(100), nullable=False, index=True)
-    region = Column(String(100), nullable=True, index=True)
-    cost_index = Column(Numeric(5, 2), nullable=True)
-    popularity_score = Column(Integer, default=0)
-    description = Column(Text, nullable=True)
+    continent = Column(String(50), nullable=False, index=True)
+    tagline = Column(String(255), nullable=False)
+    description = Column(Text, nullable=False)
+    hero_image = Column(Text, nullable=False)
+    gallery = Column(JSON, default=list)  # List of image URLs
+    vibes = Column(JSON, default=list)    # List of vibes e.g. ['Cultural', 'Culinary']
+    average_daily_cost = Column(Float, default=150.0)
+    currency = Column(String(10), default="USD")
+    recommended_days = Column(Integer, default=5)
+    best_months = Column(JSON, default=list)
+    climate = Column(String(100), default="Temperate")
+    current_temp = Column(String(50), nullable=True)
+    highlights = Column(JSON, default=list)
+    local_etiquette = Column(JSON, default=list)
+    featured = Column(Boolean, default=False)
+    rating = Column(Float, default=4.8)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class ItineraryModel(Base):
+    __tablename__ = "itineraries"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    title = Column(String(150), nullable=False)
+    tagline = Column(String(255), nullable=True)
+    destination = Column(String(100), nullable=False, index=True)
+    country = Column(String(100), nullable=False)
+    continent = Column(String(50), default="Global")
+    cover_image = Column(Text, nullable=False)
+    start_date = Column(String(30), nullable=False)
+    end_date = Column(String(30), nullable=False)
+    total_days = Column(Integer, default=4)
+    travel_party = Column(String(50), default="Couple")
+    vibes = Column(JSON, default=list)
+    total_budget = Column(Float, default=1800.0)
+    currency = Column(String(10), default="USD")
+    status = Column(String(30), default="Upcoming")  # Draft, Upcoming, Active, Completed
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relational Children
+    days = relationship("DayPlanModel", back_populates="itinerary", cascade="all, delete-orphan", order_by="DayPlanModel.day_number")
+    expenses = relationship("ExpenseModel", back_populates="itinerary", cascade="all, delete-orphan")
+    packing_list = relationship("PackingItemModel", back_populates="itinerary", cascade="all, delete-orphan")
+
+
+class DayPlanModel(Base):
+    __tablename__ = "day_plans"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    itinerary_id = Column(String, ForeignKey("itineraries.id", ondelete="CASCADE"), nullable=False, index=True)
+    day_number = Column(Integer, nullable=False)
+    date = Column(String(30), nullable=True)
+    title = Column(String(150), nullable=False)
+    theme = Column(String(100), nullable=True)
+    overview = Column(Text, nullable=True)
+    accommodation = Column(JSON, nullable=True)  # {name, address, costPerNight, bookingStatus}
+
+    itinerary = relationship("ItineraryModel", back_populates="days")
+    activities = relationship("ActivityModel", back_populates="day_plan", cascade="all, delete-orphan")
+
+
+class ActivityModel(Base):
+    __tablename__ = "activities"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    day_plan_id = Column(String, ForeignKey("day_plans.id", ondelete="CASCADE"), nullable=False, index=True)
+    itinerary_id = Column(String, ForeignKey("itineraries.id", ondelete="CASCADE"), nullable=True, index=True)
+    title = Column(String(150), nullable=False)
+    time_of_day = Column(String(30), default="Morning")  # Morning, Afternoon, Evening, Night
+    time = Column(String(20), nullable=True)
+    duration = Column(String(30), nullable=True)
+    location = Column(String(150), nullable=False)
+    description = Column(Text, nullable=False)
+    estimated_cost = Column(Float, default=0.0)
+    currency = Column(String(10), default="USD")
+    category = Column(String(50), default="Activities")
     image_url = Column(Text, nullable=True)
+    booking_status = Column(String(50), default="Not Needed")  # Booked, Need to Book, Optional, Not Needed
+    booking_url = Column(Text, nullable=True)
+    booking_reference = Column(String(100), nullable=True)
+    transit_notes = Column(Text, nullable=True)
+    is_completed = Column(Boolean, default=False)
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+    tags = Column(JSON, default=list)
 
-    __table_args__ = (CheckConstraint('cost_index >= 0', name='check_cost_index_positive'),)
+    day_plan = relationship("DayPlanModel", back_populates="activities")
 
-    activities = relationship("ActivityCatalog", back_populates="city", cascade="all, delete-orphan")
-    stops = relationship("TripStop", back_populates="city")
-    saved_by_users = relationship("UserSavedDestination", back_populates="city", cascade="all, delete-orphan")
 
-class ActivityCatalog(Base):
-    __tablename__ = "activities_catalog"
+class ExpenseModel(Base):
+    __tablename__ = "expenses"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    city_id = Column(UUID(as_uuid=True), ForeignKey("cities.id", ondelete="CASCADE"), nullable=False, index=True)
+    id = Column(String, primary_key=True, default=generate_uuid)
+    itinerary_id = Column(String, ForeignKey("itineraries.id", ondelete="CASCADE"), nullable=False, index=True)
     title = Column(String(150), nullable=False)
-    description = Column(Text, nullable=True)
-    category = Column(String(50), nullable=False, index=True)
-    estimated_cost = Column(Numeric(10, 2), nullable=False)
-    estimated_duration_mins = Column(Integer, nullable=True)
-    image_url = Column(Text, nullable=True)
-
-    __table_args__ = (
-        CheckConstraint('estimated_cost >= 0', name='check_cost_positive'),
-        CheckConstraint('estimated_duration_mins > 0', name='check_duration_positive')
-    )
-
-    city = relationship("City", back_populates="activities")
-
-class Trip(Base):
-    __tablename__ = "trips"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    title = Column(String(150), nullable=False)
-    description = Column(Text, nullable=True)
-    start_date = Column(Date, nullable=False)
-    end_date = Column(Date, nullable=False)
-    cover_photo_url = Column(Text, nullable=True)
-    share_slug = Column(String(64), unique=True, nullable=True, index=True)
-    is_public = Column(Boolean, default=False)
-    total_budget = Column(Numeric(10, 2), default=0.00)
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
-    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    __table_args__ = (
-        CheckConstraint('end_date >= start_date', name='check_trip_dates'),
-        CheckConstraint('total_budget >= 0', name='check_budget_positive')
-    )
-
-    user = relationship("User", back_populates="trips")
-    stops = relationship("TripStop", back_populates="trip", cascade="all, delete-orphan")
-    expenses = relationship("ExpenseBreakdown", back_populates="trip", cascade="all, delete-orphan")
-
-class TripStop(Base):
-    __tablename__ = "trip_stops"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    trip_id = Column(UUID(as_uuid=True), ForeignKey("trips.id", ondelete="CASCADE"), nullable=False, index=True)
-    city_id = Column(UUID(as_uuid=True), ForeignKey("cities.id", ondelete="RESTRICT"), nullable=False)
-    stop_order = Column(Integer, nullable=False)
-    start_date = Column(Date, nullable=False)
-    end_date = Column(Date, nullable=False)
-
-    __table_args__ = (
-        CheckConstraint('end_date >= start_date', name='check_stop_dates'),
-        CheckConstraint('stop_order >= 1', name='check_stop_order_positive'),
-        UniqueConstraint('trip_id', 'stop_order', name='uq_trip_stop_order')
-    )
-
-    trip = relationship("Trip", back_populates="stops")
-    city = relationship("City", back_populates="stops")
-    activities = relationship("ItineraryActivity", back_populates="trip_stop", cascade="all, delete-orphan")
-
-class ItineraryActivity(Base):
-    __tablename__ = "itinerary_activities"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    trip_stop_id = Column(UUID(as_uuid=True), ForeignKey("trip_stops.id", ondelete="CASCADE"), nullable=False, index=True)
-    activity_id = Column(UUID(as_uuid=True), ForeignKey("activities_catalog.id", ondelete="SET NULL"), nullable=True)
-    title = Column(String(150), nullable=False)
-    scheduled_time = Column(DateTime(timezone=True), nullable=True)
-    cost = Column(Numeric(10, 2), default=0.00)
-    display_order = Column(Integer, nullable=False, default=1)
+    category = Column(String(50), default="Activities")  # Flights, Stays, Dining, Activities, Transit, Shopping, Misc
+    amount = Column(Float, nullable=False, default=0.0)
+    currency = Column(String(10), default="USD")
+    date = Column(String(30), nullable=True)
+    paid_by = Column(String(100), nullable=True)
+    is_paid = Column(Boolean, default=False)
     notes = Column(Text, nullable=True)
 
-    __table_args__ = (CheckConstraint('cost >= 0', name='check_activity_cost_positive'),)
+    itinerary = relationship("ItineraryModel", back_populates="expenses")
 
-    trip_stop = relationship("TripStop", back_populates="activities")
 
-class ExpenseBreakdown(Base):
-    __tablename__ = "expense_breakdowns"
+class PackingItemModel(Base):
+    __tablename__ = "packing_items"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    trip_id = Column(UUID(as_uuid=True), ForeignKey("trips.id", ondelete="CASCADE"), nullable=False, index=True)
-    category = Column(String(50), nullable=False)
-    amount = Column(Numeric(10, 2), nullable=False)
-    expense_date = Column(Date, nullable=True)
-    description = Column(String(255), nullable=True)
+    id = Column(String, primary_key=True, default=generate_uuid)
+    itinerary_id = Column(String, ForeignKey("itineraries.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(150), nullable=False)
+    category = Column(String(50), default="Essentials")  # Essentials, Clothing, Tech, Toiletries, Documents, Health
+    is_packed = Column(Boolean, default=False)
+    quantity = Column(Integer, default=1)
+    is_custom = Column(Boolean, default=False)
 
-    __table_args__ = (
-        CheckConstraint('amount >= 0', name='check_expense_amount_positive'),
-        CheckConstraint("category IN ('transport', 'stay', 'activities', 'meals', 'other')", name='check_expense_category')
-    )
-
-    trip = relationship("Trip", back_populates="expenses")
-
-class UserSavedDestination(Base):
-    __tablename__ = "user_saved_destinations"
-
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
-    city_id = Column(UUID(as_uuid=True), ForeignKey("cities.id", ondelete="CASCADE"), primary_key=True)
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
-
-    user = relationship("User", back_populates="saved_destinations")
-    city = relationship("City", back_populates="saved_by_users")
+    itinerary = relationship("ItineraryModel", back_populates="packing_list")
